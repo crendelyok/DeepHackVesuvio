@@ -1,4 +1,7 @@
-.PHONY format
+.PHONY: install
 
-format:
-	ruff format
+install:
+	python3.12 -m venv venv
+	source venv/bin/activate
+	pip install -r requirements.txt
+	pre-commit install
