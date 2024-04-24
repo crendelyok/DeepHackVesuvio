@@ -1,6 +1,7 @@
 """Пример работы с чатом через gigachain"""
-from langchain.schema import HumanMessage, SystemMessage
+
 from langchain.chat_models.gigachat import GigaChat
+from langchain.schema import HumanMessage, SystemMessage
 
 # Авторизация в сервисе GigaChat
 chat = GigaChat(credentials="", verify_ssl_certs=False)
@@ -11,7 +12,7 @@ messages = [
     )
 ]
 
-while(True):
+while True:
     user_input = input("User: ")
     messages.append(HumanMessage(content=user_input))
     res = chat(messages)
