@@ -15,3 +15,4 @@ echo export GIGA_CREDS="***" > .env
 # Prerequisites
 
 1) python3.10
+
