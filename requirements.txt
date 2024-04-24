@@ -2,3 +2,4 @@ gigachain-cli
 ruff
 pre-commit
 isort
+gigagraph
