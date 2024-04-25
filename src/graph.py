@@ -1,23 +1,36 @@
-from typing import List
+from typing import Sequence, TypedDict
 
 from langchain_core.messages import BaseMessage
-from langgraph.graph import END, MessageGraph
+from langgraph.graph import END, StateGraph
 
 
-def build_graph(generation_node, reflection_node):
-    builder = MessageGraph()
-    builder.add_node("generate", generation_node)
-    builder.add_node("reflect", reflection_node)
-    builder.set_entry_point("generate")
+class AgentState(TypedDict):
+    messages: Sequence[BaseMessage]
+    iteration: int
+    question: str
+    context: str
+    reflection: str
+    generation: str
 
-    def should_continue(state: List[BaseMessage]):
-        if len(state) > 6:
-            # End after 3 iterations
+
+def build_graph(summarizer, generator, revisor):
+    MAX_ITERATIONS = 8
+    builder = StateGraph(AgentState)
+
+    builder.add_node("summarize", summarizer.summarize)
+    builder.add_node("generator", generator.respond)
+    builder.add_node("revisor", revisor.respond)
+
+    builder.add_edge("summarize", "generator")
+    builder.add_edge("revisor", "generator")
+
+    def event_loop(state) -> str:
+        # in our case, we'll just stop after N plans
+        if state["iteration"] > MAX_ITERATIONS:
             return END
-        return "reflect"
+        return "revisor"
 
-    builder.add_conditional_edges("generate", should_continue)
-    builder.add_edge("reflect", "generate")
+    builder.add_conditional_edges("generator", event_loop)
+    builder.set_entry_point("summarize")
     graph = builder.compile()
-
     return graph

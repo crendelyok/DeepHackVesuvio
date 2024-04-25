@@ -1,0 +1,6 @@
+  model: "GigaChat-Plus-preview"
+  top_p: 0.8
+  scope: "GIGACHAT_API_CORP"
+  papers:
+    - "https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123560715.pdf"
+  question: "как еще улучшить subcenter arcface loss?"

@@ -1,53 +1,62 @@
-import asyncio
 import os
-from typing import List, Sequence
+from pprint import pprint
 
-from langchain_community.chat_models import GigaChat
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+import yaml
+from langchain.chat_models.gigachat import GigaChat
 
+from agent_responder import ResponderWithRetries
 from graph import build_graph
-from prompts import DEFAULT_PROMPT, REFLECTION_PROMPT
+from prompts.generator import generation_prompt
+from prompts.revisor import revisor_prompt
+from summarizer import Summarizer, SummarizerMock
 
 
-async def main():
+def main(config: dict, papers: list[str], question: str, debug: bool = True):
     llm = GigaChat(
         credentials=os.environ["GIGACHAD_VIP_CREDS"],
+        profanity_check=False,
         verify_ssl_certs=False,
-        scope="GIGACHAT_API_CORP",
-        model="GigaChat-Pro",
+        timeout=600,
+        model=config["model"],
+        top_p=config["top_p"],
+        scope=config["scope"],
     )
 
-    generate = DEFAULT_PROMPT | llm
-    reflect = REFLECTION_PROMPT | llm
+    summarizer = SummarizerMock("")
+    if not debug:
+        summarizer = Summarizer(
+            papers,
+            llm=llm,
+        )
 
-    async def generation_node(state: Sequence[BaseMessage]):
-        return await generate.ainvoke({"messages": state})
+    revisor_chain = revisor_prompt | llm
+    revisor = ResponderWithRetries(runnable=revisor_chain, actor="revisor")
 
-    async def reflection_node(messages: Sequence[BaseMessage]) -> List[BaseMessage]:
-        # Other messages we need to adjust
-        cls_map = {"ai": HumanMessage, "human": AIMessage}
-        # First message is the original user request. We hold it the same for all nodes
-        translated = [messages[0]] + [
-            cls_map[msg.type](content=msg.content) for msg in messages[1:]
-        ]
-        res = await reflect.ainvoke({"messages": translated})
-        # We treat the output of this as human feedback for the generator
-        return HumanMessage(content=res.content)
+    generator_chain = generation_prompt | llm
+    generator = ResponderWithRetries(
+        runnable=generator_chain,
+        actor="generation",
+    )
 
-    graph = build_graph(generation_node, reflection_node)
-
-    async for event in graph.astream(
-        [
-            HumanMessage(
-                content="Значение 'Маленького принца' в детстве современных детей"
-            )
-        ],
-    ):
-        print(event)
-        print("---")
+    graph = build_graph(summarizer, generator, revisor)
+    events = graph.stream(
+        {
+            "iteration": 0,
+            "question": question,
+        }
+    )
+    for i, step in enumerate(events):
+        node, output = next(iter(step.items()))
+        print(f"## {i+1}. {node}")
+        pprint(output)
+        print("---" * 10)
 
 
 if __name__ == "__main__":
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main())
-    loop.close()
+    with open("config.yaml") as stream:
+        try:
+            config = yaml.safe_load(stream)
+        except yaml.YAMLError as exc:
+            print(exc)
+    print(config)
+    main(config, papers=config["papers"], question=config["question"], debug=True)

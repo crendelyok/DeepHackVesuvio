@@ -3,3 +3,6 @@ ruff
 pre-commit
 isort
 gigagraph
+chromadb
+pypdf
+pyyml

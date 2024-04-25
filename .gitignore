@@ -162,3 +162,5 @@ cython_debug/
 .history/
 .DS_Store
 */.DS_Store
+*/*.ipynb
+*.pdf
