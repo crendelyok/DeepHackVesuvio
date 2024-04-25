@@ -1,5 +1,4 @@
 import os
-from pprint import pprint
 
 import yaml
 from langchain.chat_models.gigachat import GigaChat
@@ -45,18 +44,25 @@ def main(config: dict, papers: list[str], question: str, debug: bool = True):
             "question": question,
         }
     )
+    output_str = ""
     for i, step in enumerate(events):
         node, output = next(iter(step.items()))
-        print(f"## {i+1}. {node}")
-        pprint(output)
-        print("---" * 10)
+        if node == "summarize":
+            output = output["context"]
+        elif node == "generator":
+            output = output["generation"]
+        else:
+            output = output["reflection"]
+        print(output)
+        output_str += f"## {i+1}. {node}\n"
+        output_str += str(output) + "\n"
+        output_str += "---" * 10 + "\n"
+
+    print(output_str)
+    return output_str
 
 
 if __name__ == "__main__":
     with open("config.yaml") as stream:
-        try:
-            config = yaml.safe_load(stream)
-        except yaml.YAMLError as exc:
-            print(exc)
-    print(config)
+        config = yaml.safe_load(stream)
     main(config, papers=config["papers"], question=config["question"], debug=True)

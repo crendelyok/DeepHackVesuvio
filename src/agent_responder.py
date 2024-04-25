@@ -13,8 +13,6 @@ class ResponderWithRetries:
         response = []
         for attempt in range(5):
             try:
-                # pprint(f"input state {state}")pprint(f"response: {response}")
-                # pprint(f"input : {state['reflection']}")
                 if self.actor == "generation":
                     response = self.runnable.invoke(
                         {

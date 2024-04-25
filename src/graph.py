@@ -1,11 +1,9 @@
-from typing import Sequence, TypedDict
+from typing import TypedDict
 
-from langchain_core.messages import BaseMessage
 from langgraph.graph import END, StateGraph
 
 
 class AgentState(TypedDict):
-    messages: Sequence[BaseMessage]
     iteration: int
     question: str
     context: str
