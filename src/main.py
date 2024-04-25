@@ -1,71 +1,65 @@
 import asyncio
 import os
-from typing import List, Sequence
 
-from langchain.chains import RetrievalQA
 from langchain_community.chat_models import GigaChat
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain_core.messages import HumanMessage
 
-from define_db import define_db
+from define_db import get_article_summary
 from graph import build_graph
-from prompts import DEFAULT_PROMPT
+from prompts import GENERATION_PROMPT, REFLECTION_PROMPT
 
 
 async def main():
-    db = define_db()
-    context_retriever = db.as_retriever()
-
     llm = GigaChat(
         credentials=os.environ["GIGACHAD_VIP_CREDS"],
         verify_ssl_certs=False,
         scope="GIGACHAT_API_CORP",
         model="GigaChat-Pro",
     )
-    """
-    generate = DEFAULT_PROMPT | llm
+
+    context = get_article_summary("../articles/example.pdf")
+
+    print(f"context : {context}")
+
+    generate = GENERATION_PROMPT | llm
     reflect = REFLECTION_PROMPT | llm
-    """
-    qa_chain_gen = RetrievalQA.from_chain_type(
-        llm,
-        retriever=context_retriever,
-        return_source_documents=True,
-        chain_type_kwargs={"prompt": DEFAULT_PROMPT},
-    )
-    """
-    qa_chain_refl = RetrievalQA.from_chain_type(
-        llm,
-        retriever=context_retriever,
-        return_source_documents=True,
-        chain_type_kwargs={"prompt": REFLECTION_PROMPT},
-    )
-    """
 
-    async def generation_node(state: Sequence[BaseMessage]):
-        return await qa_chain_gen.ainvoke({"query": ""})
-        # return await generate.ainvoke({"messages": state, "context": str(context_retriever)})
+    async def generation_node(message):
+        # print(message)
+        # print(type(message))
+        return await generate.ainvoke(
+            {
+                "context": context,
+                "reflection": "",
+                "question": "Generate research idea based on provided context.",
+            }
+        )
 
-    async def reflection_node(messages: Sequence[BaseMessage]) -> List[BaseMessage]:
+    async def reflection_node(message):
         # Other messages we need to adjust
         # cls_map = {"ai": HumanMessage, "human": AIMessage}
+        # print(f'message from generator : {message}')
+        # print(type(message))
         # First message is the original user request. We hold it the same for all nodes
         """
-        translated = [messages[0]] + [
-            cls_map[msg.type](content=msg.content) for msg in messages[1:]
+        translated = [message[0]] + [
+            cls_map[message.type](content=message.content)
         ]
         """
-        # res = qa_chain_refl.ainvoke({{"query" : translated}})
-        # res = await reflect.ainvoke({"messages": translated, "context" : context_retriever})
+        res = await reflect.ainvoke(
+            {
+                "context": context,
+                "generation": message,
+                "question": "Generate research idea based on provided context.",
+            }
+        )
         # We treat the output of this as human feedback for the generator
-        # return HumanMessage(content=res.content)
+        return HumanMessage(content=res.content)
 
     graph = build_graph(generation_node, reflection_node)
 
     async for event in graph.astream(
-        [
-            HumanMessage(
-                content="Formulate an innovative hypothesis for further scientific research based on the scientific articles by Korakianintis."
-            )
-        ],
+        [HumanMessage(content="Generate research idea based on provided context.")],
     ):
         print(event)
         print("---")
