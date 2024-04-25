@@ -1,3 +1,5 @@
+import concurrent.futures
+
 from langchain.chains.summarize import load_summarize_chain
 from langchain.prompts import PromptTemplate
 from langchain.text_splitter import CharacterTextSplitter
@@ -8,13 +10,30 @@ from prompts.summarizer import prompt_template, refine_template
 
 class Summarizer:
     def __init__(self, pdf_paths, llm):
-        pdf_path = pdf_paths[0]
-        loader = PyPDFLoader(pdf_path)
+        self.pdf_paths = pdf_paths
+        self.llm = llm
+
+    def get_article_summary(self, path_to_pdf):
+        loader = PyPDFLoader(path_to_pdf)
+
         docs = loader.load()
-        self.split_docs = CharacterTextSplitter(
+
+        split_docs = CharacterTextSplitter(
             chunk_size=5000, chunk_overlap=500
         ).split_documents(docs)
-        self.llm = llm
+
+        chain = load_summarize_chain(
+            llm=self.llm,
+            chain_type="refine",
+            question_prompt=self.prompt,
+            refine_prompt=self.refine_prompt,
+            return_intermediate_steps=True,
+            input_key="input_documents",
+            output_key="output_text",
+        )
+
+        result = chain({"input_documents": split_docs}, return_only_outputs=True)
+        return result["output_text"] + "\n"
 
     def summarize(self, question: str):
         prompt = PromptTemplate.from_template(
@@ -23,19 +42,20 @@ class Summarizer:
         refine_prompt = PromptTemplate.from_template(
             refine_template, partial_variables={"question": question}
         )
-        chain = load_summarize_chain(
-            llm=self.llm,
-            chain_type="refine",
-            question_prompt=prompt.partial(question=question),
-            refine_prompt=refine_prompt.partial(question=question),
-            return_intermediate_steps=True,
-            input_key="input_documents",
-            output_key="output_text",
-        )
-        result = chain({"input_documents": self.split_docs}, return_only_outputs=True)
-        print(f"Summarizer.summarize({question}): {result}")
+
+        self.prompt = prompt
+        self.refine_prompt = refine_prompt
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=16) as executor:
+            results = list(executor.map(self.get_article_summary, self.pdf_paths))
+
+        general_result = ""
+        for individual_result in results:
+            general_result += individual_result
+
+        print(f"Summarizer.summarize({question}): {general_result}")
         return {
-            "context": result["output_text"],
+            "context": general_result,
         }
 
 
