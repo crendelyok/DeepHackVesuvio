@@ -16,7 +16,12 @@ logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 
 def main(
-    config: dict, papers: list[str], question: str, credentials: str, debug: bool = True
+    config: dict,
+    papers: list[str],
+    question: str,
+    credentials: str,
+    max_iterations: int = 10,
+    debug: bool = True,
 ) -> str:
     """Generates ideas for a given question and papers.
 
@@ -25,6 +30,7 @@ def main(
         papers (list[str]): list of paths to papers to summarize. e.g. [https://www.ecva.net/papers/eccv_2020/papers_ECCV/papers/123560715.pdf]
         question (str): user specified question
         credentials (str): gigachat credentials
+        max_iterations (int): maximum number of generation-reflection steps. Defaults to 10.
         debug (bool, optional): debug allow to mock summarization as the longest operation. Defaults to True.
 
     Returns:
@@ -57,7 +63,7 @@ def main(
         actor="generation",
     )
 
-    graph = build_graph(summarizer, generator, revisor)
+    graph = build_graph(summarizer, generator, revisor, max_iterations)
     events = graph.stream(
         {
             "iteration": 0,
@@ -90,5 +96,6 @@ if __name__ == "__main__":
         papers=config["papers"],
         question=config["question"],
         credentials=os.environ["GIGACHAD_VIP_CREDS"],
+        max_iterations=config["max_iterations"],
         debug=False,
     )

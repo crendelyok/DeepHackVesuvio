@@ -1,18 +1,10 @@
-# Install
-
-1) 
-```
-make install
-```
-2)
-get creds
-
-3) 
-```
-echo export GIGA_CREDS="***" > .env
-```
-
 # Prerequisites
 
-1) python3.10
+python >= 3.10
 
+# Run
+```
+git clone https://github.com/crendelyok/DeepHackVesuvio.git
+cd DeepHackVesuvio/
+make run
+```

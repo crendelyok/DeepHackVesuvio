@@ -6,3 +6,4 @@ gigagraph
 chromadb
 pypdf
 pyyml
+streamlit

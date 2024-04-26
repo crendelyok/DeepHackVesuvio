@@ -11,8 +11,7 @@ class AgentState(TypedDict):
     generation: str
 
 
-def build_graph(summarizer, generator, revisor):
-    MAX_ITERATIONS = 8
+def build_graph(summarizer, generator, revisor, max_iterations):
     builder = StateGraph(AgentState)
 
     builder.add_node("summarize", summarizer.summarize)
@@ -24,7 +23,7 @@ def build_graph(summarizer, generator, revisor):
 
     def event_loop(state) -> str:
         # in our case, we'll just stop after N plans
-        if state["iteration"] > MAX_ITERATIONS:
+        if state["iteration"] > max_iterations:
             return END
         return "revisor"
 
