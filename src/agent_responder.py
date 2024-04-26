@@ -1,31 +1,44 @@
-from langchain_core.messages import HumanMessage
+import logging
+import sys
+
 from langsmith import traceable
+
+std_logger = logging.getLogger(__name__)
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
 
 
 class ResponderWithRetries:
-    def __init__(self, runnable, actor: str, validator=None):
+    def __init__(self, runnable, actor: str, validator=None, n_retries: int = 5):
         self.runnable = runnable
         self.validator = validator
         self.actor = actor
+        self.n_retries = n_retries
 
     @traceable
     def respond(self, state):
         response = []
-        for attempt in range(5):
+        default_input_state = {
+            "context": state["context"],
+            "question": state["question"],
+        }
+        default_return_state = {
+            "context": state["context"],
+            "iteration": state["iteration"] + 1,
+            "question": state["question"],
+        }
+        for attempt in range(self.n_retries):
             try:
                 if self.actor == "generation":
                     response = self.runnable.invoke(
                         {
-                            "context": state["context"],
-                            "question": state["question"],
+                            **default_input_state,
                             "reflection": state["reflection"],
                         }
                     )
                 else:
                     response = self.runnable.invoke(
                         {
-                            "context": state["context"],
-                            "question": state["question"],
+                            **default_input_state,
                             "generation": state["generation"],
                         }
                     )
@@ -34,28 +47,20 @@ class ResponderWithRetries:
                     self.validator.invoke(response)
                 if self.actor == "generation":
                     return {
-                        "context": state["context"],
-                        "iteration": state["iteration"] + 1,
-                        "question": state["question"],
+                        **default_return_state,
                         "reflection": state["reflection"],
                         "generation": response.content,
                     }
                 return {
-                    "context": state["context"],
-                    "iteration": state["iteration"] + 1,
-                    "question": state["question"],
+                    **default_return_state,
                     "reflection": response.content,
                     "generation": state["generation"],
                 }
             except Exception as e:
-                message = HumanMessage(content=repr(e))
-                if response.response_metadata["finish_reason"] != "error":
-                    state["messages"] += [message]
-        print("something bad happened")
+                std_logger.error(repr(e))
+        std_logger.warning("ResponderWithRetries: something strange happened")
         return {
-            "context": state["context"],
-            "iteration": state["iteration"] + 1,
-            "question": state["question"],
+            **default_return_state,
             "reflection": state["reflection"],
             "generation": state["generation"],
         }

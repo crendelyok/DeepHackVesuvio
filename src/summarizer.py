@@ -1,4 +1,6 @@
 import concurrent.futures
+import logging
+import sys
 
 from langchain.chains.summarize import load_summarize_chain
 from langchain.prompts import PromptTemplate
@@ -7,6 +9,9 @@ from langchain_community.document_loaders import PyPDFLoader
 
 from prompts.summarizer import prompt_template, refine_template
 
+std_logger = logging.getLogger(__name__)
+logging.basicConfig(stream=sys.stdout, level=logging.INFO)
+
 
 class Summarizer:
     def __init__(self, pdf_paths, llm):
@@ -14,7 +19,11 @@ class Summarizer:
         self.llm = llm
 
     def get_article_summary(self, path_to_pdf):
-        loader = PyPDFLoader(path_to_pdf)
+        try:
+            loader = PyPDFLoader(path_to_pdf)
+        except Exception as e:
+            std_logger.error("Error while loading pdf: " + str(e))
+            return ""
 
         docs = loader.load()
 
@@ -53,14 +62,14 @@ class Summarizer:
         for individual_result in results:
             general_result += individual_result
 
-        print(f"Summarizer.summarize({question}): {general_result}")
+        std_logger.debug(f"Summarizer.summarize({question}): {general_result}")
         return {
             "context": general_result,
         }
 
 
 class SummarizerMock:
-    def __init__(self, pdf_paths):
+    def __init__(self, pdf_paths, llm):
         pass
 
     def summarize(self, question: str):
